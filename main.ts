@@ -5,6 +5,30 @@ import { join } from 'node:path';
 
 function execute(P: Uint8Array, I: Uint8Array): { out: Uint8Array; code: number } {
   const n = P.length;
+  // Two-operand handlers, indexed by opcode - 0x10; null where the slot holds
+  // a unary op (NEG/NOT) or nothing at all. Division by zero is screened
+  // before dispatch, so the four quotient handlers never see b == 0.
+  const BIN: Array<((a: number, b: number) => number) | null> = [
+    (a, b) => (a + b) | 0,
+    (a, b) => (a - b) | 0,
+    (a, b) => Math.imul(a, b),
+    (a, b) => (a === -2147483648 && b === -1 ? a : (a / b) | 0),
+    (a, b) => (b === -1 ? 0 : (a % b) | 0),
+    (a, b) => Math.floor((a >>> 0) / (b >>> 0)) | 0,
+    (a, b) => ((a >>> 0) % (b >>> 0)) | 0,
+    null,
+    (a, b) => a & b,
+    (a, b) => a | b,
+    (a, b) => a ^ b,
+    null,
+    (a, b) => a << (b & 31),
+    (a, b) => a >> (b & 31),
+    (a, b) => (a >>> (b & 31)) | 0,
+    null,
+    (a, b) => (a === b ? 1 : 0),
+    (a, b) => (a < b ? 1 : 0),
+    (a, b) => ((a >>> 0) < (b >>> 0) ? 1 : 0),
+  ];
   const T = new Int32Array(256);
   let d = 0;
   const R = new Int32Array(64);
@@ -57,24 +81,9 @@ function execute(P: Uint8Array, I: Uint8Array): { out: Uint8Array; code: number 
       case 0x18: case 0x19: case 0x1a: case 0x1c: case 0x1d: case 0x1e:
       case 0x20: case 0x21: case 0x22: {
         const b = T[d - 1], a = T[d - 2];
-        let v = 0;
-        if (op === 0x10) v = (a + b) | 0;
-        else if (op === 0x11) v = (a - b) | 0;
-        else if (op === 0x12) v = Math.imul(a, b);
-        else if (op === 0x13) { if (b === 0) return fin(4); v = a === -2147483648 && b === -1 ? a : (a / b) | 0; }
-        else if (op === 0x14) { if (b === 0) return fin(4); v = b === -1 ? 0 : (a % b) | 0; }
-        else if (op === 0x15) { if (b === 0) return fin(4); v = Math.floor((a >>> 0) / (b >>> 0)) | 0; }
-        else if (op === 0x16) { if (b === 0) return fin(4); v = ((a >>> 0) % (b >>> 0)) | 0; }
-        else if (op === 0x18) v = a & b;
-        else if (op === 0x19) v = a | b;
-        else if (op === 0x1a) v = a ^ b;
-        else if (op === 0x1c) v = a << (b & 31);
-        else if (op === 0x1d) v = a >> (b & 31);
-        else if (op === 0x1e) v = (a >>> (b & 31)) | 0;
-        else if (op === 0x20) v = a === b ? 1 : 0;
-        else if (op === 0x21) v = a < b ? 1 : 0;
-        else v = (a >>> 0) < (b >>> 0) ? 1 : 0;
-        d -= 2; T[d++] = v; break;
+        if (op >= 0x13 && op <= 0x16 && b === 0) return fin(4);
+        const h = BIN[op - 0x10];
+        d -= 2; T[d++] = h ? h(a, b) : 0; break;
       }
       case 0x30: case 0x31: case 0x32: {
         const rel = ((P[nx - 2] | (P[nx - 1] << 8)) << 16) >> 16;
