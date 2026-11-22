@@ -4,8 +4,4 @@
 
 # Tiny stack VM
 
-Entry for make.fun's **tiny-stack-vm-01-run-20261122** ($100, top 10 × $10):
-a faithful interpreter of the tiny stack ISA v1 in one `main.ts` (Node 22,
-stdlib only, deterministic). It runs each of the set's 40 programs and writes
-`/output/<id>/stdout.bin` + `exit.txt` — all ten traps with their exact codes,
-the step/output limits, 32-bit wrapping, and the signed/unsigned edge cases.
+Entry for make.fun's **tiny-stack-vm-01-run-20261122** ($100, top 10 × $10): a faithful interpreter of the tiny stack ISA v1 in one `main.ts` (Node 22, stdlib only, deterministic) — all ten traps, step/output limits, 32-bit wrapping, signed/unsigned edge cases.
